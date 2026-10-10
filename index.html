@@ -8,7 +8,7 @@
     // ==========================================================
     // 1. 카카오 REST API 키 (발급받은 키를 여기에 붙여넣으세요)
     // ==========================================================
-    const KAKAO_REST_API_KEY = "여기에_카카오_REST_API_키를_입력하세요";
+    const KAKAO_REST_API_KEY = "ea563b5554a480da606e9a1889174c89";
 
     // 2. 기본 프리셋 좌표 (자주 가는 곳은 API 호출 없이 0초 만에 직행)
     const PRESET_PLACES = {
@@ -50,7 +50,7 @@
       // 3) 새로운 장소인 경우: 카카오 API로 실시간 좌표 검색
       fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(targetName)}`, {
         headers: {
-          Authorization: `KakaoAK ${ea563b5554a480da606e9a1889174c89}`
+          Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`
         }
       })
       .then(response => response.json())
