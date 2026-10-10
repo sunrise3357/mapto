@@ -2,84 +2,37 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MapTo 길찾기</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>네이버지도 길찾기</title>
   <script>
-    // ==========================================================
-    // 1. 카카오 REST API 키 (발급받은 키를 여기에 붙여넣으세요)
-    // ==========================================================
-    const KAKAO_REST_API_KEY = "ea563b5554a480da606e9a1889174c89";
-
-    // 2. 기본 프리셋 좌표 (자주 가는 곳은 API 호출 없이 0초 만에 직행)
-    const PRESET_PLACES = {
-      "미사역파라곤": { lat: 37.5651612, lng: 127.1942672 },
-      "명동역":       { lat: 37.560989,  lng: 126.986325 },
-      "강남역":       { lat: 37.497952,  lng: 127.027619 }
+    // 1. 목적지별 좌표 목록 (자주 가는 곳을 자유롭게 추가하세요)
+    const PLACES = {
+      "미사역파라곤": { lat: "37.5651612", lng: "127.1942672" },
+      "미사역":       { lat: "37.5627",    lng: "127.1932" },
+      "명동역":       { lat: "37.560989",  lng: "126.986325" },
+      "강남역":       { lat: "37.497952",  lng: "127.027619" },
+      "잠실역":       { lat: "37.513261",  lng: "127.100133" },
+      "서울역":       { lat: "37.554648",  lng: "126.972559" }
     };
 
-    // 안드로이드 네이버지도 앱 직행 실행 (확인창 없는 Intent 표준 규격)
-    function launchNaverMap(name, lat, lng) {
-      const intentUrl = `intent://route/public?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name)}&appname=misa-paragon-route#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`;
-      location.replace(intentUrl);
-    }
+    // 2. URL 뒤의 목적지 추출 (?명동역, ?미사역파라곤 등)
+    const query = decodeURIComponent(location.search.replace(/^\?/, "")).trim();
+    const dest = query || "미사역파라곤";
+    const target = PLACES[dest] || PLACES["미사역파라곤"];
 
-    // URL에서 목적지 이름 추출 (?명동역, ?미사역파라곤 등)
-    function getDestinationName() {
-      const search = location.search.startsWith("?") ? location.search.substring(1) : location.search;
-      if (!search) return "미사역파라곤";
-      if (!search.includes("=")) return decodeURIComponent(search).trim();
-      const params = new URLSearchParams(location.search);
-      return params.get("dname") || params.get("dest") || params.get("q") || "미사역파라곤";
-    }
-
-    const targetName = getDestinationName();
-
-    // 1) 기본 프리셋 또는 브라우저 로컬 저장소에서 좌표 확인
-    let cachedCoord = PRESET_PLACES[targetName];
-    if (!cachedCoord) {
-      try {
-        const saved = localStorage.getItem("mapto_" + targetName);
-        if (saved) cachedCoord = JSON.parse(saved);
-      } catch (e) {}
-    }
-
-    // 2) 이미 좌표가 있는 경우: 대기 시간 0초로 즉시 실행 (확인창 없음!)
-    if (cachedCoord && cachedCoord.lat && cachedCoord.lng) {
-      launchNaverMap(targetName, cachedCoord.lat, cachedCoord.lng);
-    } else {
-      // 3) 새로운 장소인 경우: 카카오 API로 실시간 좌표 검색
-      fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(targetName)}`, {
-        headers: {
-          Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.documents && data.documents.length > 0) {
-          const first = data.documents[0];
-          const lat = parseFloat(first.y);
-          const lng = parseFloat(first.x);
-
-          // 다음 접속 시에는 확인창 없이 0초 만에 열리도록 로컬에 저장
-          try {
-            localStorage.setItem("mapto_" + targetName, JSON.stringify({ lat, lng }));
-          } catch (e) {}
-
-          launchNaverMap(targetName, lat, lng);
-        } else {
-          // 검색 결과가 아예 없을 때만 검색 화면으로 연결
-          location.replace(`intent://search?query=${encodeURIComponent(targetName)}&appname=misa-paragon-route#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`);
-        }
-      })
-      .catch(error => {
-        // 네트워크 에러 시 검색 스킴으로 대체
-        location.replace(`nmap://search?query=${encodeURIComponent(targetName)}&appname=misa-paragon-route`);
-      });
-    }
+    // 3. 처음 주신 원래 파일 방식 그대로 즉시 실행
+    const U = "nmap://route/public?dlat=" + target.lat + "&dlng=" + target.lng + "&dname=" + encodeURIComponent(dest) + "&appname=misa-paragon-route";
+    location.replace(U);
   </script>
 </head>
-<body style="font-family:sans-serif; text-align:center; padding-top:25vh; line-height:1.6;">
-  <h2>네이버지도 대중교통 연결 중...</h2>
-  <p>잠시만 기다려 주세요.</p>
+<body style="font-family:sans-serif; text-align:center; padding-top:25vh">
+  <h2 id="title">네이버지도 실행 중</h2>
+  <p>대중교통 길찾기를 실행합니다.</p>
+  <button style="padding:18px 30px; background:#03c75a; color:white; border:0; border-radius:12px; font-size:18px" onclick="location.href=U">
+    네이버지도 다시 실행
+  </button>
+  <script>
+    document.getElementById("title").innerText = dest + " 가는 길";
+  </script>
 </body>
 </html>
