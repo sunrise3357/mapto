@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MapTo 길찾기</title>
+  <script>
+    // 1. 자주 가는 곳 기본 좌표 (API 호출 없이 0초 만에 직행)
+    const PRESETS = {
+      "서울역":       { lat: "37.554648",  lng: "126.972559" }
+    };
+
+    // 2. 카카오 REST API 키 (발급받은 키를 입력하세요)
+    const KAKAO_KEY = "ea563b5554a480da606e9a1889174c89";
+
+    // 원본 실행 방식 그대로 네이버지도 앱 실행
+    function openApp(name, lat, lng) {
+      const U = "nmap://route/public?dlat=" + lat + "&dlng=" + lng + "&dname=" + encodeURIComponent(name) + "&appname=misa-paragon-route";
+      location.replace(U);
+    }
+
+    // URL에서 목적지 추출 (/명동역 또는 ?명동역 모두 지원)
+    function getDestination() {
+      // 1) 경로 형태 확인: /mapto/명동역 또는 /mapto/명동역/
+      const pathParts = decodeURIComponent(location.pathname).split("/").filter(Boolean);
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart !== "mapto" && lastPart !== "index.html" && lastPart !== "404.html") {
+          return lastPart;
+        }
+      }
+
+      // 2) 쿼리 형태 확인: /mapto/?명동역
+      const s = location.search.startsWith("?") ? location.search.substring(1) : location.search;
+      if (s) {
+        if (!s.includes("=")) return decodeURIComponent(s).trim();
+        const p = new URLSearchParams(location.search);
+        const val = p.get("dname") || p.get("dest") || p.get("q");
+        if (val) return val;
+      }
+
+      return "미사역파라곤"; // 기본값
+    }
+
+    const dest = getDestination();
+
+    // 1단계: 기본 프리셋 또는 브라우저 로컬 저장소 확인
+    let target = PRESETS[dest];
+    if (!target) {
+      try {
+        const cached = localStorage.getItem("mapto_coord_" + dest);
+        if (cached) target = JSON.parse(cached);
+      } catch (e) {}
+    }
+
+    // 이미 좌표를 알면 0초 만에 즉시 실행
+    if (target && target.lat && target.lng) {
+      openApp(dest, target.lat, target.lng);
+    } else {
+      // 2단계: 모르는 곳이면 카카오 API로 실시간 좌표 검색
+      fetchCoordinates(dest).then(coord => {
+        if (coord) {
+          try {
+            localStorage.setItem("mapto_coord_" + dest, JSON.stringify(coord));
+          } catch (e) {}
+          openApp(dest, coord.lat, coord.lng);
+        } else {
+          // 검색 실패 시 네이버지도 앱 검색으로 연결
+          location.replace("nmap://search?query=" + encodeURIComponent(dest) + "&appname=misa-paragon-route");
+        }
+      });
+    }
+
+    // 카카오 로컬 검색 API 함수
+    async function fetchCoordinates(query) {
+      if (KAKAO_KEY && KAKAO_KEY.length > 5) {
+        try {
+          const res = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?query=" + encodeURIComponent(query), {
+            headers: { Authorization: "KakaoAK " + KAKAO_KEY }
+          });
+          const data = await res.json();
+          if (data.documents && data.documents.length > 0) {
+            return { lat: data.documents[0].y, lng: data.documents[0].x };
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
+  </script>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding-top:25vh; margin:0;" onclick="if(target) openApp(dest, target.lat, target.lng);">
+  <h2 id="title">네이버지도 연결 중...</h2>
+  <p style="color:#666;">대중교통 길찾기를 실행합니다.</p>
+  <button style="padding:18px 30px; background:#03c75a; color:white; border:0; border-radius:12px; font-size:18px; margin-top:20px;" onclick="openApp(dest, target.lat, target.lng)">
+    네이버지도 다시 실행
+  </button>
+  <script>
+    document.getElementById("title").innerText = dest + " 가는 길";
+  </script>
+</body>
+</html>
