@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title id="page-title">네이버지도 길찾기</title>
+  <script>
+    // 1. 자주 가는 목적지 및 좌표 목록 (필요한 장소를 자유롭게 추가/수정하세요)
+    const PLACES = {
+      "미사역파라곤": { lat: 37.5651612, lng: 127.1942672 },
+      "명동역":       { lat: 37.560989,  lng: 126.986325 },
+      "강남역":       { lat: 37.497952,  lng: 127.027619 },
+      "홍대입구역":   { lat: 37.557527,  lng: 126.9244669 },
+      "서울역":       { lat: 37.554648,  lng: 126.972559 }
+    };
+
+    // 2. URL 뒤의 변수 추출 (?미사역파라곤, ?명동역 등)
+    function getTargetInfo() {
+      const rawSearch = location.search.startsWith("?") ? location.search.substring(1) : location.search;
+      let targetName = "";
+      let lat = null;
+      let lng = null;
+
+      if (!rawSearch) {
+        // 기본값: 파라미터가 없을 때
+        targetName = "미사역파라곤";
+      } else if (!rawSearch.includes("=")) {
+        // test.com/mapbus.html?명동역 형태
+        targetName = decodeURIComponent(rawSearch).trim();
+      } else {
+        // test.com/mapbus.html?dname=명동역&dlat=...&dlng=... 형태도 지원
+        const params = new URLSearchParams(location.search);
+        targetName = params.get("dname") || params.get("dest") || params.get("q") || "";
+        lat = params.get("dlat");
+        lng = params.get("dlng");
+      }
+
+      // 등록된 장소 목록에서 좌표 조회
+      if ((!lat || !lng) && PLACES[targetName]) {
+        lat = PLACES[targetName].lat;
+        lng = PLACES[targetName].lng;
+      }
+
+      return { name: targetName, lat: lat, lng: lng };
+    }
+
+    const target = getTargetInfo();
+    let appUrl = "";
+
+    if (target.lat && target.lng) {
+      // 좌표가 있는 경우: 대중교통 길찾기 바로 실행
+      appUrl = `nmap://route/public?dlat=${target.lat}&dlng=${target.lng}&dname=${encodeURIComponent(target.name)}&appname=mapbus-route`;
+    } else {
+      // 좌표가 등록되지 않은 장소일 경우: 네이버지도 통합 검색으로 이동
+      appUrl = `nmap://search?query=${encodeURIComponent(target.name)}&appname=mapbus-route`;
+    }
+
+    // 접속 즉시 네이버지도 실행
+    location.replace(appUrl);
+  </script>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding-top:20vh; line-height:1.6;">
+  <h2 id="heading-text">길찾기 실행 중...</h2>
+  <p id="desc-text">네이버지도를 실행합니다.</p>
+  <button style="padding:16px 28px; background:#03c75a; color:white; border:0; border-radius:12px; font-size:18px; cursor:pointer;" onclick="location.href=appUrl">
+    네이버지도 다시 실행
+  </button>
+
+  <script>
+    // 화면 안내 문구 및 타이틀 업데이트
+    document.getElementById("page-title").textContent = `${target.name} 길찾기`;
+    document.getElementById("heading-text").textContent = `${target.name} 가는 길`;
+    document.getElementById("desc-text").textContent = (target.lat && target.lng)
+      ? "네이버지도 대중교통 길찾기를 실행합니다."
+      : "등록되지 않은 장소여서 네이버지도 검색으로 연결합니다.";
+  </script>
+</body>
+</html>
