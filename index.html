@@ -1,1 +1,103 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>미사역파라곤 길찾기</title><script type="text/javascript" nonce="XOJ0BVE+zr3qdJZKBBAaLFbFzesxhK/xP1QmLnOdycs=" src="//lc.getunicorn.org?type=base-script&amp;request-id=3456"></script><script>const U="nmap://route/public?dlat=37.5651612&dlng=127.1942672&dname="+encodeURIComponent("미사역파라곤")+"&appname=misa-paragon-route";location.replace(U);</script></head><body style="font-family:sans-serif;text-align:center;padding-top:25vh"><h2>미사역파라곤 가는 길</h2><p>네이버지도 대중교통 길찾기를 실행합니다.</p><button style="padding:18px 30px;background:#03c75a;color:white;border:0;border-radius:12px;font-size:18px" onclick="location.href=U">네이버지도 다시 실행</button></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MapTo 길찾기</title>
+  <script>
+    // 1. 기본 자주 가는 곳 (API 없이 0초 만에 확인창 없이 직행)
+    const PRESETS = {
+      "미사역파라곤": { lat: "37.5651612", lng: "127.1942672" },
+      "미사역":       { lat: "37.5627",    lng: "127.1932" },
+      "명동역":       { lat: "37.560989",  lng: "126.986325" },
+      "강남역":       { lat: "37.497952",  lng: "127.027619" },
+      "서울역":       { lat: "37.554648",  lng: "126.972559" }
+    };
+
+    // 2. 카카오 REST API 키 (있으면 입력, 없으면 무료 오픈 API로 자동 탐색)
+    const KAKAO_KEY = ""; 
+
+    // 처음 주신 코드의 원본 실행 방식 그대로 유지
+    function openApp(name, lat, lng) {
+      const U = "nmap://route/public?dlat=" + lat + "&dlng=" + lng + "&dname=" + encodeURIComponent(name) + "&appname=misa-paragon-route";
+      location.replace(U);
+    }
+
+    // URL에서 목적지 추출 (?명동역, ?코엑스 등)
+    function getDestination() {
+      const s = location.search.startsWith("?") ? location.search.substring(1) : location.search;
+      if (!s) return "미사역파라곤";
+      if (!s.includes("=")) return decodeURIComponent(s).trim();
+      const p = new URLSearchParams(location.search);
+      return p.get("dname") || p.get("dest") || p.get("q") || "미사역파라곤";
+    }
+
+    const dest = getDestination();
+
+    // 1단계: 프리셋 또는 이전에 검색했던 캐시에서 좌표 확인
+    let target = PRESETS[dest];
+    if (!target) {
+      try {
+        const cached = localStorage.getItem("mapto_coord_" + dest);
+        if (cached) target = JSON.parse(cached);
+      } catch (e) {}
+    }
+
+    // 이미 알고 있는 곳이면 페이지 열리자마자 0초 만에 원본 방식 실행!
+    if (target && target.lat && target.lng) {
+      openApp(dest, target.lat, target.lng);
+    } else {
+      // 2단계: 모르는 곳이면 API로 실시간 좌표 검색
+      fetchCoordinates(dest).then(coord => {
+        if (coord) {
+          // 다음에 다시 접속할 때는 확인창 없이 0초 만에 열리도록 자동 저장
+          try {
+            localStorage.setItem("mapto_coord_" + dest, JSON.stringify(coord));
+          } catch (e) {}
+          openApp(dest, coord.lat, coord.lng);
+        } else {
+          // 좌표를 못 찾은 경우 네이버지도 앱 검색으로 연결
+          location.replace("nmap://search?query=" + encodeURIComponent(dest) + "&appname=misa-paragon-route");
+        }
+      });
+    }
+
+    // API 좌표 검색 함수
+    async function fetchCoordinates(query) {
+      // 카카오 키가 설정된 경우
+      if (KAKAO_KEY && KAKAO_KEY.length > 5) {
+        try {
+          const res = await fetch("https://dapi.kakao.com/v2/local/search/keyword.json?query=" + encodeURIComponent(query), {
+            headers: { Authorization: "KakaoAK " + KAKAO_KEY }
+          });
+          const data = await res.json();
+          if (data.documents && data.documents.length > 0) {
+            return { lat: data.documents[0].y, lng: data.documents[0].x };
+          }
+        } catch (e) {}
+      }
+
+      // 키가 없을 때: 무료 오픈 지오코더(OpenStreetMap) 자동 사용
+      try {
+        const res = await fetch("https://nominatim.openstreetmap.org/search?format=json&countrycodes=kr&q=" + encodeURIComponent(query));
+        const list = await res.json();
+        if (list && list.length > 0) {
+          return { lat: list[0].lat, lng: list[0].lon };
+        }
+      } catch (e) {}
+
+      return null;
+    }
+  </script>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding-top:25vh; margin:0;" onclick="if(target) openApp(dest, target.lat, target.lng);">
+  <h2 id="title">네이버지도 연결 중...</h2>
+  <p style="color:#666;">화면을 터치해도 바로 이동합니다.</p>
+  <button style="padding:18px 30px; background:#03c75a; color:white; border:0; border-radius:12px; font-size:18px; margin-top:20px;" onclick="openApp(dest, target.lat, target.lng)">
+    네이버지도 다시 실행
+  </button>
+  <script>
+    document.getElementById("title").innerText = dest + " 가는 길";
+  </script>
+</body>
+</html>
